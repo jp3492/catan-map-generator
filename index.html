@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Catan Seafarers Map Generator</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        min-height: 100vh;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        color: #fff;
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 16px;
+      }
+
+      h1 {
+        margin-bottom: 20px;
+        font-size: 2rem;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .controls {
+        display: grid;
+        align-content: space-between;
+        gap: 20px;
+        align-items: center;
+        margin-bottom: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px 25px;
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+        justify-content: center;
+      }
+
+      .controls-inputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 20px;
+      }
+
+      .control-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      label {
+        font-weight: 500;
+      }
+
+      select {
+        padding: 8px 16px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 5px;
+        background: #fff;
+        cursor: pointer;
+      }
+
+      button {
+        padding: 10px 24px;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 5px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .canvas-container {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      canvas {
+        display: block;
+        border-radius: 10px;
+      }
+
+      .stats {
+        margin-top: 15px;
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+        flex-wrap: wrap;
+      }
+
+      .stat {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .stat-value {
+        font-weight: 600;
+        color: #667eea;
+      }
+
+      /* Balance table */
+      .balance-section {
+        margin-top: 20px;
+        width: 100%;
+        max-width: 940px;
+      }
+
+      .balance-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .balance-header h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      .balance-rating {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .rating-excellent {
+        background: rgba(46, 204, 113, 0.25);
+        color: #2ecc71;
+      }
+      .rating-good {
+        background: rgba(52, 152, 219, 0.25);
+        color: #3498db;
+      }
+      .rating-fair {
+        background: rgba(241, 196, 15, 0.25);
+        color: #f1c40f;
+      }
+      .rating-poor {
+        background: rgba(231, 76, 60, 0.25);
+        color: #e74c3c;
+      }
+
+      #balanceTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      #balanceTable th,
+      #balanceTable td {
+        padding: 8px 12px;
+        text-align: center;
+      }
+
+      #balanceTable th {
+        background: rgba(255, 255, 255, 0.08);
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+      }
+
+      #balanceTable td {
+        color: rgba(255, 255, 255, 0.75);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .player-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+
+      .score-bar {
+        display: inline-block;
+        height: 6px;
+        border-radius: 3px;
+        vertical-align: middle;
+        margin-right: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <h1>Catan Seafarers Map Generator</h1>
+      <div class="controls-inputs">
+        <div class="control-group">
+          <label for="playerCount">Players:</label>
+          <select id="playerCount">
+            <option value="3">3 Players</option>
+            <option value="4" selected>4 Players</option>
+            <option value="5">5 Players</option>
+            <option value="6">6 Players</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="islandCountSelect">Islands:</label>
+          <select id="islandCountSelect">
+            <option value="1">1 Island</option>
+            <option value="2" selected>2 Islands</option>
+            <option value="3">3 Islands</option>
+            <option value="4">4 Islands</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="islandTilesPerPlayer">Island Tiles/Player:</label>
+          <select id="islandTilesPerPlayer">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+      </div>
+      <button id="generateBtn">Generate New Map</button>
+      <div>
+        <div class="stats">
+          <div class="stat">
+            Main Land: <span class="stat-value" id="mainLandTiles">0</span>
+          </div>
+          <div class="stat">
+            Islands: <span class="stat-value" id="islandCount">0</span>
+          </div>
+          <div class="stat">
+            Island Tiles: <span class="stat-value" id="islandTiles">0</span>
+          </div>
+          <div class="stat">
+            Water: <span class="stat-value" id="waterTiles">0</span>
+          </div>
+        </div>
+
+        <div class="balance-section" id="balanceSection" style="display: none">
+          <div class="balance-header">
+            <h2>Player Balance</h2>
+            <span class="balance-rating" id="balanceRating"></span>
+          </div>
+          <table id="balanceTable">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Resources</th>
+                <th>Harbors</th>
+                <th>Islands</th>
+                <th>Expansion</th>
+                <th>Diversity</th>
+                <th>Composite</th>
+              </tr>
+            </thead>
+            <tbody id="balanceBody"></tbody>
+          </table>
+
+          <div style="margin-top: 12px">
+            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 6px">Resource Weights <span style="font-weight: 400; font-size: 0.8rem; opacity: 0.7">(avg pips/tile)</span></h3>
+            <div id="resourceWeights" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-container">
+      <canvas id="boardCanvas" width="900" height="800"></canvas>
+    </div>
+
+<script>
+// =============================================================================
+// CATAN SEAFARERS BALANCED MAP GENERATOR
+// =============================================================================
+// Pure algorithm — no DOM dependencies. Testable in browser or Node.js.
+// Exports: CatanMapGenerator (window/global) or module.exports
+// =============================================================================
+
+(function () {
+  'use strict';
+
+  // ===========================================================================
+  // SECTION 1: CONFIGURATION
+  // ===========================================================================
+
+  const DEFAULT_CONFIG = {
+    // -- Board Topology (Step 1) --
+    board: {
+      // [Q, R, S] — symmetric when S=Q so all side edges are equal length.
+      // Q = horizontal extent, R = vertical extent, S = diagonal constraint.
+      frameSizes: {
+        3: [4, 3, 4],   // 51 tiles
+        4: [4, 3, 4],   // 51 tiles
+        5: [4, 4, 4],   // 61 tiles
+        6: [5, 4, 5],   // 79 tiles
+      },
+      mainlandTilesPerPlayer: 5,
+      mainlandBaseExtra: 1,
+      maxAspectRatio: 2.5,
+      minCoastalRatio: 0.4,
+    },
+
+    // -- Islands (Step 1) --
+    islands: {
+      islandTilesPerPlayer: 2,
+      minGapFromMainland: 2,
+      maxGapFromMainland: 4,
+    },
+
+    // -- Starting Positions (Step 2) --
+    startingPositions: {
+      minPairDistance: 3,
+      minInterPlayerDistance: 2,
+      minLandHexesPerVertex: 2,
+      requireCoastalAccess: true,
+    },
+
+    // -- Harbors (Step 3) --
+    harbors: {
+      harborsPerPlayer: 1.5,
+      genericRatio: 0.4,
+      minSpacingEdges: 2,
+    },
+
+    // -- Resources (Step 4) --
+    resources: {
+      baseDistribution: { wood: 4, wheat: 4, sheep: 4, ore: 3, brick: 3, desert: 1 },
+      scalingWeights: { wood: 0.21, wheat: 0.21, sheep: 0.21, ore: 0.16, brick: 0.16, desert: 0.05 },
+      maxDeserts: 2,
+    },
+
+    // -- Number Tokens (Step 5) --
+    numbers: {
+      basePool: [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12],
+      pipValues: { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 },
+      noAdjacentRedNumbers: true,
+      // Weight for resource-type pip balance penalty in number optimisation.
+      // Higher = stronger preference for even pip distribution across resource types.
+      resourcePipBalanceWeight: 0.15,
+    },
+
+    // -- Composite Balance Scoring --
+    balance: {
+      weights: { resource: 0.35, harbor: 0.20, island: 0.15, expansion: 0.15, diversity: 0.15 },
+      thresholds: { excellent: 0.08, good: 0.15, fair: 0.22 },
+      // Minimum normalised score any player should have in any category.
+      // Maps violating this are penalised during selection.
+      minCategoryScore: 0.25,
+      // Penalty multiplier per violation point (deficit below minCategoryScore)
+      minCategoryPenalty: 0.5,
+    },
+
+    // -- Optimization Tuning --
+    optimization: {
+      step2Iterations: 200,
+      step3Iterations: 150,
+      step4Iterations: 400,
+      step5Iterations: 800,
+      finalPassIterations: 100,
+      maxTopologyRetries: 12,
+    },
+  };
+
+  function deepMerge(target, source) {
+    if (!source) return target;
+    const result = { ...target };
+    for (const key of Object.keys(source)) {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        result[key] = deepMerge(target[key] || {}, source[key]);
+      } else {
+        result[key] = source[key];
+      }
+    }
+    return result;
+  }
+
+  // ===========================================================================
+  // SECTION 2: HEX GRID UTILITIES
+  // ===========================================================================
+  // Flat-top hexagons with axial coordinates (q, r).
+  // Each hex owns two canonical vertices: v=0 (East) and v=1 (South-East).
+  //
+  // Vertex (q,r,0) — E vertex — touches hexes: (q,r), (q+1,r), (q+1,r-1)
+  // Vertex (q,r,1) — SE vertex — touches hexes: (q,r), (q+1,r), (q,r+1)
+  //
+  // Adjacent vertices:
+  //   (q,r,0) ↔ (q,r,1), (q,r-1,1), (q+1,r-1,1)
+  //   (q,r,1) ↔ (q,r,0), (q-1,r+1,0), (q,r+1,0)
+  // ===========================================================================
+
+  function hexKey(q, r) { return `${q},${r}`; }
+  function parseHexKey(key) {
+    const parts = key.split(',');
+    return { q: parseInt(parts[0], 10), r: parseInt(parts[1], 10) };
+  }
+  function vertexKey(q, r, v) { return `${q},${r},${v}`; }
+  function parseVertexKey(key) {
+    const parts = key.split(',');
+    return { q: parseInt(parts[0], 10), r: parseInt(parts[1], 10), v: parseInt(parts[2], 10) };
+  }
+
+  const HEX_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
+
+  function hexNeighbors(q, r) {
+    return HEX_DIRS.map(([dq, dr]) => ({ q: q + dq, r: r + dr }));
+  }
+
+  function hexDistance(q1, r1, q2, r2) {
+    return (Math.abs(q1 - q2) + Math.abs(r1 - r2) + Math.abs((q1 + r1) - (q2 + r2))) / 2;
+  }
+
+  /** Returns the 3 hexes that share this vertex. */
+  function vertexHexes(q, r, v) {
+    if (v === 0) return [{ q, r }, { q: q + 1, r }, { q: q + 1, r: r - 1 }];
+    return [{ q, r }, { q: q + 1, r }, { q, r: r + 1 }];
+  }
+
+  /** Returns the 3 vertices adjacent to this vertex (connected by edges). */
+  function adjacentVertices(q, r, v) {
+    if (v === 0) {
+      return [
+        { q, r, v: 1 },
+        { q, r: r - 1, v: 1 },
+        { q: q + 1, r: r - 1, v: 1 },
+      ];
+    }
+    return [
+      { q, r, v: 0 },
+      { q: q - 1, r: r + 1, v: 0 },
+      { q, r: r + 1, v: 0 },
+    ];
+  }
+
+  /** Returns canonical (q,r,v) keys for all 6 vertices of hex (q,r). */
+  function getHexVertexKeys(q, r) {
+    return [
+      vertexKey(q, r, 0),         // 0  E
+      vertexKey(q, r, 1),         // 1  SE
+      vertexKey(q - 1, r + 1, 0), // 2  SW
+      vertexKey(q - 1, r, 1),     // 3  W
+      vertexKey(q - 1, r, 0),     // 4  NW
+      vertexKey(q, r - 1, 1),     // 5  NE
+    ];
+  }
+
+  /** Pixel position of hex centre (flat-top, y-down). */
+  function hexToPixel(q, r, size) {
+    return {
+      x: size * 1.5 * q,
+      y: size * Math.sqrt(3) * (r + q / 2),
+    };
+  }
+
+  /** Pixel position of a canonical vertex. */
+  function vertexToPixel(q, r, v, size) {
+    const c = hexToPixel(q, r, size);
+    if (v === 0) return { x: c.x + size, y: c.y };
+    return { x: c.x + size * 0.5, y: c.y + size * Math.sqrt(3) * 0.5 };
+  }
+
+  /** Generate all hex coords inside the stretched-hexagon frame. */
+  function generateFrame(Q, R, S) {
+    const hexes = [];
+    for (let q = -Q; q <= Q; q++) {
+      const rMin = Math.max(-R, -S - q);
+      const rMax = Math.min(R, S - q);
+      for (let r = rMin; r <= rMax; r++) {
+        hexes.push({ q, r });
+      }
+    }
+    return hexes;
+  }
+
+  /** Collect every unique vertex touching at least one hex in `tiles`. */
+  function getAllBoardVertices(tiles) {
+    const verts = new Set();
+    for (const key of tiles.keys()) {
+      const { q, r } = parseHexKey(key);
+      for (const vk of getHexVertexKeys(q, r)) verts.add(vk);
+    }
+    return verts;
+  }
+
+  /** BFS from a single vertex; returns Map<vertexKey, distance>. */
+  function bfsFromVertex(startKey, boardVertices) {
+    const dist = new Map();
+    dist.set(startKey, 0);
+    const queue = [startKey];
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
+      const d = dist.get(cur);
+      const { q, r, v } = parseVertexKey(cur);
+      for (const adj of adjacentVertices(q, r, v)) {
+        const ak = vertexKey(adj.q, adj.r, adj.v);
+        if (boardVertices.has(ak) && !dist.has(ak)) {
+          dist.set(ak, d + 1);
+          queue.push(ak);
+        }
+      }
+    }
+    return dist;
+  }
+
+  // Distance cache: Map<vertexKey, Map<vertexKey, number>>
+  let _distCache = new Map();
+  function resetDistCache() { _distCache = new Map(); }
+
+  function getVertexDist(v1, v2, boardVertices) {
+    if (v1 === v2) return 0;
+    if (!_distCache.has(v1)) {
+      _distCache.set(v1, bfsFromVertex(v1, boardVertices));
+    }
+    const d = _distCache.get(v1).get(v2);
+    return d !== undefined ? d : Infinity;
+  }
+
+  /** Get set of hex keys adjacent to a player's starting pair. */
+  function getPlayerAdjacentHexKeys(pair, tiles) {
+    const result = new Set();
+    for (const vk of [pair.v1, pair.v2]) {
+      const { q, r, v } = parseVertexKey(vk);
+      for (const h of vertexHexes(q, r, v)) {
+        const hk = hexKey(h.q, h.r);
+        if (tiles.has(hk)) result.add(hk);
+      }
+    }
+    return result;
+  }
+
+  /** Shuffle array in place (Fisher-Yates). */
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  /** Pick random element from array. */
+  function randPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // ===========================================================================
+  // SECTION 3: STEP 1 — GENERATE BOARD TOPOLOGY
+  // ===========================================================================
+
+  function generateTopology(playerCount, islandCount, config) {
+    const frameDef = config.board.frameSizes[playerCount];
+    if (!frameDef) return null;
+    const [Q, R, S] = frameDef;
+    const frameHexes = generateFrame(Q, R, S);
+
+    const tiles = new Map();
+    for (const { q, r } of frameHexes) tiles.set(hexKey(q, r), 'water');
+
+    // --- Grow mainland via weighted BFS from centre ---
+    const mainlandTarget = playerCount * config.board.mainlandTilesPerPlayer + config.board.mainlandBaseExtra;
+    const mainland = new Set();
+    const startHex = hexKey(0, 0);
+    if (!tiles.has(startHex)) return null;
+
+    mainland.add(startHex);
+    tiles.set(startHex, 'land');
+
+    const frontier = new Set();
+    for (const nb of hexNeighbors(0, 0)) {
+      const k = hexKey(nb.q, nb.r);
+      if (tiles.has(k) && tiles.get(k) === 'water') frontier.add(k);
+    }
+
+    while (mainland.size < mainlandTarget && frontier.size > 0) {
+      // Weighted random pick — prefer hexes closer to centre
+      const candidates = [];
+      let totalWeight = 0;
+      for (const k of frontier) {
+        const { q, r } = parseHexKey(k);
+        const w = 1 / (1 + hexDistance(0, 0, q, r));
+        candidates.push({ key: k, weight: w });
+        totalWeight += w;
+      }
+      let rand = Math.random() * totalWeight;
+      let selected = candidates[0].key;
+      for (const c of candidates) {
+        rand -= c.weight;
+        if (rand <= 0) { selected = c.key; break; }
+      }
+
+      const { q, r } = parseHexKey(selected);
+      mainland.add(selected);
+      tiles.set(selected, 'land');
+      frontier.delete(selected);
+
+      for (const nb of hexNeighbors(q, r)) {
+        const k = hexKey(nb.q, nb.r);
+        if (tiles.has(k) && tiles.get(k) === 'water' && !mainland.has(k)) {
+          frontier.add(k);
+        }
+      }
+    }
+
+    // --- Validate mainland shape ---
+    let minPx = Infinity, maxPx = -Infinity, minPy = Infinity, maxPy = -Infinity;
+    for (const k of mainland) {
+      const { q, r } = parseHexKey(k);
+      const p = hexToPixel(q, r, 1);
+      minPx = Math.min(minPx, p.x); maxPx = Math.max(maxPx, p.x);
+      minPy = Math.min(minPy, p.y); maxPy = Math.max(maxPy, p.y);
+    }
+    const width = maxPx - minPx || 1;
+    const height = maxPy - minPy || 1;
+    const aspect = Math.max(width / height, height / width);
+    if (aspect > config.board.maxAspectRatio) return null;
+
+    let coastalCount = 0;
+    for (const k of mainland) {
+      const { q, r } = parseHexKey(k);
+      const isCoastal = hexNeighbors(q, r).some(nb => {
+        const nk = hexKey(nb.q, nb.r);
+        return !tiles.has(nk) || tiles.get(nk) !== 'land';
+      });
+      if (isCoastal) coastalCount++;
+    }
+    if (coastalCount / mainland.size < config.board.minCoastalRatio) return null;
+
+    // --- Compute exclusion zone around mainland ---
+    const exclusion = new Set();
+    for (const k of mainland) {
+      const { q, r } = parseHexKey(k);
+      // Add all hexes within minGapFromMainland
+      for (const fh of frameHexes) {
+        if (hexDistance(q, r, fh.q, fh.r) < config.islands.minGapFromMainland) {
+          exclusion.add(hexKey(fh.q, fh.r));
+        }
+      }
+    }
+
+    // --- Place island areas ---
+    const islandAreas = [];
+    const usedIslandHexes = new Set();
+    const actualIslandCount = Math.min(islandCount, 4);
+    const totalIslandTiles = playerCount * config.islands.islandTilesPerPlayer;
+
+    // Find valid seed candidates (water hexes outside exclusion, inside frame)
+    const seedCandidates = [];
+    for (const { q, r } of frameHexes) {
+      const k = hexKey(q, r);
+      if (tiles.get(k) !== 'water') continue;
+      if (exclusion.has(k)) continue;
+      // Check max gap
+      let minMainlandDist = Infinity;
+      for (const mk of mainland) {
+        const m = parseHexKey(mk);
+        const d = hexDistance(q, r, m.q, m.r);
+        if (d < minMainlandDist) minMainlandDist = d;
+      }
+      if (minMainlandDist <= config.islands.maxGapFromMainland) {
+        const angle = Math.atan2(
+          hexToPixel(q, r, 1).y,
+          hexToPixel(q, r, 1).x
+        );
+        seedCandidates.push({ q, r, key: k, angle });
+      }
+    }
+
+    for (let i = 0; i < actualIslandCount; i++) {
+      if (seedCandidates.length === 0) break;
+
+      // Pick seed maximising angular separation from existing islands
+      let bestSeed = null;
+      if (islandAreas.length === 0) {
+        bestSeed = randPick(seedCandidates);
+      } else {
+        let bestMinSep = -1;
+        for (const sc of seedCandidates) {
+          if (usedIslandHexes.has(sc.key)) continue;
+          let minSep = Infinity;
+          for (const ia of islandAreas) {
+            for (const ihk of ia) {
+              const ih = parseHexKey(ihk);
+              const a2 = Math.atan2(hexToPixel(ih.q, ih.r, 1).y, hexToPixel(ih.q, ih.r, 1).x);
+              let sep = Math.abs(sc.angle - a2);
+              if (sep > Math.PI) sep = 2 * Math.PI - sep;
+              if (sep < minSep) minSep = sep;
+            }
+          }
+          if (minSep > bestMinSep) {
+            bestMinSep = minSep;
+            bestSeed = sc;
+          }
+        }
+      }
+      if (!bestSeed || usedIslandHexes.has(bestSeed.key)) continue;
+
+      // Distribute total island tiles evenly across islands
+      const placed = usedIslandHexes.size;
+      const remainingTiles = totalIslandTiles - placed;
+      const remainingIslands = actualIslandCount - i;
+      const targetSize = Math.max(1, Math.round(remainingTiles / remainingIslands));
+
+      const island = new Set();
+      island.add(bestSeed.key);
+      usedIslandHexes.add(bestSeed.key);
+      tiles.set(bestSeed.key, 'island_area');
+
+      const isFrontier = new Set();
+      for (const nb of hexNeighbors(bestSeed.q, bestSeed.r)) {
+        const nk = hexKey(nb.q, nb.r);
+        if (tiles.has(nk) && tiles.get(nk) === 'water' && !exclusion.has(nk) && !usedIslandHexes.has(nk)) {
+          isFrontier.add(nk);
+        }
+      }
+
+      while (island.size < targetSize && isFrontier.size > 0) {
+        const pick = randPick([...isFrontier]);
+        const { q, r } = parseHexKey(pick);
+        island.add(pick);
+        usedIslandHexes.add(pick);
+        tiles.set(pick, 'island_area');
+        isFrontier.delete(pick);
+
+        for (const nb of hexNeighbors(q, r)) {
+          const nk = hexKey(nb.q, nb.r);
+          if (tiles.has(nk) && tiles.get(nk) === 'water' && !exclusion.has(nk) && !usedIslandHexes.has(nk)) {
+            isFrontier.add(nk);
+          }
+        }
+      }
+      if (island.size > 0) islandAreas.push(island);
+    }
+
+    // --- Backfill: if total island tiles are below target, place extra tiles ---
+    let totalPlaced = 0;
+    for (const ia of islandAreas) totalPlaced += ia.size;
+
+    if (totalPlaced < totalIslandTiles) {
+      // Collect all remaining valid hexes (outside exclusion, inside frame, water)
+      const remainingValid = [];
+      for (const { q, r } of frameHexes) {
+        const k = hexKey(q, r);
+        if (tiles.get(k) !== 'water') continue;
+        if (exclusion.has(k)) continue;
+        if (usedIslandHexes.has(k)) continue;
+        let minMainlandDist = Infinity;
+        for (const mk of mainland) {
+          const m = parseHexKey(mk);
+          const d = hexDistance(q, r, m.q, m.r);
+          if (d < minMainlandDist) minMainlandDist = d;
+        }
+        if (minMainlandDist <= config.islands.maxGapFromMainland) {
+          remainingValid.push({ q, r, key: k });
+        }
+      }
+
+      // Try to grow remaining tiles onto existing islands first (expand nearest island)
+      let added = true;
+      while (totalPlaced < totalIslandTiles && remainingValid.length > 0 && added) {
+        added = false;
+        for (let vi = remainingValid.length - 1; vi >= 0; vi--) {
+          if (totalPlaced >= totalIslandTiles) break;
+          const v = remainingValid[vi];
+          // Check if adjacent to any existing island tile
+          const nbs = hexNeighbors(v.q, v.r);
+          let attachedIsland = null;
+          for (const ia of islandAreas) {
+            for (const nb of nbs) {
+              if (ia.has(hexKey(nb.q, nb.r))) { attachedIsland = ia; break; }
+            }
+            if (attachedIsland) break;
+          }
+          if (attachedIsland) {
+            attachedIsland.add(v.key);
+            usedIslandHexes.add(v.key);
+            tiles.set(v.key, 'island_area');
+            remainingValid.splice(vi, 1);
+            totalPlaced++;
+            added = true;
+          }
+        }
+      }
+
+      // If still under quota, add remaining tiles to nearest existing island
+      while (totalPlaced < totalIslandTiles && remainingValid.length > 0 && islandAreas.length > 0) {
+        const v = remainingValid.shift();
+        // Find nearest island area
+        let nearestIsland = islandAreas[0];
+        let nearestDist = Infinity;
+        for (const ia of islandAreas) {
+          for (const ihk of ia) {
+            const ih = parseHexKey(ihk);
+            const d = hexDistance(v.q, v.r, ih.q, ih.r);
+            if (d < nearestDist) { nearestDist = d; nearestIsland = ia; }
+          }
+        }
+        nearestIsland.add(v.key);
+        usedIslandHexes.add(v.key);
+        tiles.set(v.key, 'island_area');
+        totalPlaced++;
+      }
+    }
+
+    return {
+      tiles,
+      mainland,
+      islandAreas,
+      frame: { Q, R, S },
+    };
+  }
+
+  // ===========================================================================
+  // SECTION 4: STEP 2 — FIND STARTING POSITION PAIRS
+  // ===========================================================================
+
+  function findStartingPositions(topology, playerCount, config) {
+    const { tiles, mainland } = topology;
+    resetDistCache();
+    const boardVerts = getAllBoardVertices(tiles);
+
+    // --- Enumerate candidate vertices on mainland ---
+    const candidateSet = new Set();
+    for (const mk of mainland) {
+      const { q, r } = parseHexKey(mk);
+      for (const vk of getHexVertexKeys(q, r)) {
+        if (candidateSet.has(vk)) continue;
+        const parsed = parseVertexKey(vk);
+        // Count adjacent land hexes
+        const landCount = vertexHexes(parsed.q, parsed.r, parsed.v)
+          .filter(h => mainland.has(hexKey(h.q, h.r))).length;
+        if (landCount >= config.startingPositions.minLandHexesPerVertex) {
+          candidateSet.add(vk);
+        }
+      }
+    }
+    const candidates = [...candidateSet];
+    if (candidates.length < playerCount * 2) return null;
+
+    // --- Check coastal access for a vertex ---
+    function hasCoastalAccess(vk) {
+      const { q, r, v } = parseVertexKey(vk);
+      return vertexHexes(q, r, v).some(h => {
+        const hk = hexKey(h.q, h.r);
+        return !tiles.has(hk) || tiles.get(hk) !== 'land';
+      });
+    }
+
+    // --- Enumerate valid pairs ---
+    const validPairs = [];
+    for (let i = 0; i < candidates.length; i++) {
+      for (let j = i + 1; j < candidates.length; j++) {
+        const d = getVertexDist(candidates[i], candidates[j], boardVerts);
+        if (d < config.startingPositions.minPairDistance) continue;
+        if (config.startingPositions.requireCoastalAccess) {
+          if (!hasCoastalAccess(candidates[i]) && !hasCoastalAccess(candidates[j])) continue;
+        }
+        validPairs.push({ v1: candidates[i], v2: candidates[j] });
+      }
+    }
+    if (validPairs.length < playerCount) return null;
+
+    // --- Check inter-player distance constraint ---
+    function checkInterPlayer(pairs) {
+      for (let a = 0; a < pairs.length; a++) {
+        for (let b = a + 1; b < pairs.length; b++) {
+          const dists = [
+            getVertexDist(pairs[a].v1, pairs[b].v1, boardVerts),
+            getVertexDist(pairs[a].v1, pairs[b].v2, boardVerts),
+            getVertexDist(pairs[a].v2, pairs[b].v1, boardVerts),
+            getVertexDist(pairs[a].v2, pairs[b].v2, boardVerts),
+          ];
+          if (Math.min(...dists) < config.startingPositions.minInterPlayerDistance) return false;
+        }
+      }
+      return true;
+    }
+
+    // --- Score a pair (Step 2 proxy score) ---
+    function scorePair(pair) {
+      const adjHexes = getPlayerAdjacentHexKeys(pair, tiles);
+      let landAccess = 0, coastalAccess = 0;
+      for (const hk of adjHexes) {
+        const t = tiles.get(hk);
+        if (t === 'land') landAccess++;
+        else coastalAccess++;
+      }
+      // Island proximity
+      let minIslandDist = Infinity;
+      for (const ia of topology.islandAreas) {
+        for (const ihk of ia) {
+          const ih = parseHexKey(ihk);
+          for (const hk of adjHexes) {
+            const h = parseHexKey(hk);
+            const d = hexDistance(h.q, h.r, ih.q, ih.r);
+            if (d < minIslandDist) minIslandDist = d;
+          }
+        }
+      }
+      const islandProx = 1 / (1 + (minIslandDist === Infinity ? 10 : minIslandDist));
+      return { landAccess, coastalAccess, islandProx };
+    }
+
+    // --- Find initial N pairs greedily ---
+    function findInitial() {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const shuffled = shuffle([...validPairs]);
+        const selected = [];
+        for (const pair of shuffled) {
+          const test = [...selected, pair];
+          if (checkInterPlayer(test)) {
+            selected.push(pair);
+            if (selected.length === playerCount) return selected;
+          }
+        }
+      }
+      return null;
+    }
+
+    let currentPairs = findInitial();
+    if (!currentPairs) return null;
+
+    // --- Count free expansion vertices (mainland vertices reachable within 2 road-steps) ---
+    function expansionCount(pair, allPairs) {
+      const occupied = new Set();
+      for (const p of allPairs) { occupied.add(p.v1); occupied.add(p.v2); }
+      const reachable = new Set();
+      for (const vk of [pair.v1, pair.v2]) {
+        const { q, r, v } = parseVertexKey(vk);
+        for (const adj of adjacentVertices(q, r, v)) {
+          const ak = vertexKey(adj.q, adj.r, adj.v);
+          if (occupied.has(ak)) continue;
+          if (vertexHexes(adj.q, adj.r, adj.v).some(h => mainland.has(hexKey(h.q, h.r)))) {
+            reachable.add(ak);
+          }
+          for (const adj2 of adjacentVertices(adj.q, adj.r, adj.v)) {
+            const a2k = vertexKey(adj2.q, adj2.r, adj2.v);
+            if (occupied.has(a2k)) continue;
+            if (vertexHexes(adj2.q, adj2.r, adj2.v).some(h => mainland.has(hexKey(h.q, h.r)))) {
+              reachable.add(a2k);
+            }
+          }
+        }
+      }
+      return reachable.size;
+    }
+
+    // --- Compute spread of step-2 scores ---
+    function step2Spread(pairs) {
+      const rawScores = pairs.map(p => {
+        const s = scorePair(p);
+        const exp = expansionCount(p, pairs);
+        return { landAccess: s.landAccess, coastalAccess: s.coastalAccess, islandProx: s.islandProx, expansion: exp };
+      });
+
+      // Normalise each sub-score
+      const normLand = normaliseArr(rawScores.map(s => s.landAccess));
+      const normCoast = normaliseArr(rawScores.map(s => s.coastalAccess));
+      const normIsland = normaliseArr(rawScores.map(s => s.islandProx));
+      const normExp = normaliseArr(rawScores.map(s => s.expansion));
+
+      const composites = rawScores.map((_, i) =>
+        0.3 * normLand[i] + 0.2 * normCoast[i] + 0.25 * normIsland[i] + 0.25 * normExp[i]
+      );
+
+      const spread = Math.max(...composites) - Math.min(...composites);
+
+      // Penalty for any normalised sub-score below minCategoryScore
+      const minCat = config.balance.minCategoryScore || 0;
+      let penalty = 0;
+      for (let i = 0; i < rawScores.length; i++) {
+        for (const norm of [normIsland[i], normExp[i]]) {
+          if (norm < minCat) penalty += (minCat - norm);
+        }
+      }
+      return spread + (config.balance.minCategoryPenalty || 0) * penalty;
+    }
+
+    // Helper to normalise an array of values to [0, 1]
+    function normaliseArr(vals) {
+      const mn = Math.min(...vals), mx = Math.max(...vals);
+      const rng = mx - mn;
+      if (rng <= 0) return vals.map(() => 1);
+      return vals.map(v => (v - mn) / rng);
+    }
+
+    // --- Optimisation loop ---
+    let bestSpread = step2Spread(currentPairs);
+    for (let iter = 0; iter < config.optimization.step2Iterations; iter++) {
+      const idx = Math.floor(Math.random() * playerCount);
+      const newPair = randPick(validPairs);
+      const testPairs = [...currentPairs];
+      testPairs[idx] = newPair;
+      if (!checkInterPlayer(testPairs)) continue;
+      const sp = step2Spread(testPairs);
+      if (sp < bestSpread) {
+        currentPairs = testPairs;
+        bestSpread = sp;
+      }
+    }
+
+    return currentPairs.map((p, i) => ({ player: i, v1: p.v1, v2: p.v2 }));
+  }
+
+  // ===========================================================================
+  // SECTION 5: STEP 3 — PLACE HARBORS
+  // ===========================================================================
+
+  function placeHarbors(topology, startPairs, playerCount, config) {
+    const { tiles } = topology;
+
+    // --- Find all coastal edges ---
+    const edgeSet = new Map(); // edgeKey → { v1, v2, landHex, waterHex }
+
+    // Edges of hex (q,r) and the neighbor they face:
+    // Edge 0→1: v=(q,r,0)↔(q,r,1), faces (q+1,r)
+    // Edge 1→2: v=(q,r,1)↔(q-1,r+1,0), faces (q,r+1)
+    // Edge 2→3: v=(q-1,r+1,0)↔(q-1,r,1), faces (q-1,r+1)
+    // Edge 3→4: v=(q-1,r,1)↔(q-1,r,0), faces (q-1,r)
+    // Edge 4→5: v=(q-1,r,0)↔(q,r-1,1), faces (q,r-1)
+    // Edge 5→0: v=(q,r-1,1)↔(q,r,0), faces (q+1,r-1)
+    const edgeDefs = [
+      { v1o: [0, 0, 0], v2o: [0, 0, 1], nb: [1, 0] },
+      { v1o: [0, 0, 1], v2o: [-1, 1, 0], nb: [0, 1] },
+      { v1o: [-1, 1, 0], v2o: [-1, 0, 1], nb: [-1, 1] },
+      { v1o: [-1, 0, 1], v2o: [-1, 0, 0], nb: [-1, 0] },
+      { v1o: [-1, 0, 0], v2o: [0, -1, 1], nb: [0, -1] },
+      { v1o: [0, -1, 1], v2o: [0, 0, 0], nb: [1, -1] },
+    ];
+
+    for (const mk of topology.mainland) {
+      const { q, r } = parseHexKey(mk);
+      for (const ed of edgeDefs) {
+        const nbQ = q + ed.nb[0], nbR = r + ed.nb[1];
+        const nbKey = hexKey(nbQ, nbR);
+        const nbType = tiles.get(nbKey);
+        // Coastal = neighbor is water or outside frame (skip island_area neighbors)
+        if (nbType === 'water' || nbType === undefined) {
+          const v1k = vertexKey(q + ed.v1o[0], r + ed.v1o[1], ed.v1o[2]);
+          const v2k = vertexKey(q + ed.v2o[0], r + ed.v2o[1], ed.v2o[2]);
+          const ek = v1k < v2k ? `${v1k}|${v2k}` : `${v2k}|${v1k}`;
+          if (!edgeSet.has(ek)) {
+            edgeSet.set(ek, { v1: v1k, v2: v2k, landHex: mk, waterHex: nbKey });
+          }
+        }
+      }
+    }
+
+    const coastalEdges = [...edgeSet.values()];
+    if (coastalEdges.length === 0) return [];
+
+    // --- Determine harbour count and types ---
+    const totalHarbors = Math.min(
+      Math.ceil(playerCount * config.harbors.harborsPerPlayer),
+      coastalEdges.length
+    );
+    const genericCount = Math.round(totalHarbors * config.harbors.genericRatio);
+    const specificCount = totalHarbors - genericCount;
+    const resourceTypes = ['wood', 'wheat', 'sheep', 'ore', 'brick'];
+    const harborTypes = [];
+    for (let i = 0; i < genericCount; i++) harborTypes.push('generic');
+    for (let i = 0; i < specificCount; i++) harborTypes.push(resourceTypes[i % resourceTypes.length]);
+    shuffle(harborTypes);
+
+    // --- Check spacing between edges (using vertex distance) ---
+    const boardVerts = getAllBoardVertices(tiles);
+
+    function checkHarborSpacing(harbors) {
+      for (let a = 0; a < harbors.length; a++) {
+        for (let b = a + 1; b < harbors.length; b++) {
+          const dists = [
+            getVertexDist(harbors[a].v1, harbors[b].v1, boardVerts),
+            getVertexDist(harbors[a].v1, harbors[b].v2, boardVerts),
+            getVertexDist(harbors[a].v2, harbors[b].v1, boardVerts),
+            getVertexDist(harbors[a].v2, harbors[b].v2, boardVerts),
+          ];
+          if (Math.min(...dists) < config.harbors.minSpacingEdges) return false;
+        }
+      }
+      return true;
+    }
+
+    // --- Initial random placement ---
+    let harbors = null;
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const shuffled = shuffle([...coastalEdges]);
+      const picked = [];
+      for (const edge of shuffled) {
+        const test = [...picked, edge];
+        if (checkHarborSpacing(test)) {
+          picked.push(edge);
+          if (picked.length === totalHarbors) break;
+        }
+      }
+      if (picked.length === totalHarbors) {
+        harbors = picked.map((e, i) => ({ ...e, type: harborTypes[i] }));
+        break;
+      }
+    }
+    if (!harbors) {
+      // Fallback: place without spacing constraint
+      harbors = shuffle([...coastalEdges]).slice(0, totalHarbors)
+        .map((e, i) => ({ ...e, type: harborTypes[i] }));
+    }
+
+    // --- Precompute static scores (island + expansion) for partial composite ---
+    const playerAdjHexes = startPairs.map(p => [...getPlayerAdjacentHexKeys(p, tiles)]);
+    const playerAdjParsed = playerAdjHexes.map(hexes => hexes.map(hk => parseHexKey(hk)));
+
+    // Island proximity (static)
+    const islandScores = startPairs.map((pair, i) => {
+      let minDist = Infinity;
+      for (const ia of topology.islandAreas) {
+        for (const ihk of ia) {
+          const ih = parseHexKey(ihk);
+          for (const ph of playerAdjParsed[i]) {
+            const d = hexDistance(ph.q, ph.r, ih.q, ih.r);
+            if (d < minDist) minDist = d;
+          }
+        }
+      }
+      return 1 / (1 + (minDist === Infinity ? 10 : minDist));
+    });
+
+    // Land access (static proxy for resource score)
+    const landAccessScores = playerAdjHexes.map(hexes =>
+      hexes.filter(hk => tiles.get(hk) === 'land').length
+    );
+
+    // --- Optimise harbor positions using partial composite ---
+    function harborAccessScore(playerIdx) {
+      let total = 0;
+      for (const h of harbors) {
+        const lh = parseHexKey(h.landHex);
+        let minD = Infinity;
+        for (const ph of playerAdjParsed[playerIdx]) {
+          const d = hexDistance(ph.q, ph.r, lh.q, lh.r);
+          if (d < minD) minD = d;
+        }
+        total += 1 / (1 + minD);
+      }
+      return total;
+    }
+
+    function partialCompositeSpread() {
+      const harborRaw = startPairs.map((_, i) => harborAccessScore(i));
+      const hMin = Math.min(...harborRaw), hMax = Math.max(...harborRaw);
+      const hRange = hMax - hMin || 1;
+      const iMin = Math.min(...islandScores), iMax = Math.max(...islandScores);
+      const iRange = iMax - iMin || 1;
+      const lMin = Math.min(...landAccessScores), lMax = Math.max(...landAccessScores);
+      const lRange = lMax - lMin || 1;
+
+      const minCat = config.balance.minCategoryScore || 0;
+      let penalty = 0;
+      const composites = startPairs.map((_, i) => {
+        const normH = (harborRaw[i] - hMin) / hRange;
+        const normI = (islandScores[i] - iMin) / iRange;
+        const normL = (landAccessScores[i] - lMin) / lRange;
+        // Penalise harbor score below minimum
+        if (normH < minCat) penalty += (minCat - normH);
+        return 0.35 * normH + 0.30 * normI + 0.35 * normL;
+      });
+      return Math.max(...composites) - Math.min(...composites)
+        + (config.balance.minCategoryPenalty || 0) * penalty;
+    }
+
+    let bestHSpread = partialCompositeSpread();
+    for (let iter = 0; iter < config.optimization.step3Iterations; iter++) {
+      const idx = Math.floor(Math.random() * harbors.length);
+      const oldEdge = harbors[idx];
+      const newEdge = randPick(coastalEdges);
+      if (harbors.some((h, i) => i !== idx && (h.v1 === newEdge.v1 || h.v2 === newEdge.v2))) continue;
+
+      harbors[idx] = { ...newEdge, type: oldEdge.type };
+      if (!checkHarborSpacing(harbors)) {
+        harbors[idx] = oldEdge;
+        continue;
+      }
+      const sp = partialCompositeSpread();
+      if (sp < bestHSpread) {
+        bestHSpread = sp;
+      } else {
+        harbors[idx] = oldEdge;
+      }
+    }
+
+    return harbors;
+  }
+
+  // ===========================================================================
+  // SECTION 6: STEP 4 — PLACE RESOURCES
+  // ===========================================================================
+
+  function placeResources(topology, startPairs, harbors, config) {
+    const { mainland, tiles } = topology;
+    const mainlandSize = mainland.size;
+
+    // --- Compute resource distribution ---
+    const base = config.resources.baseDistribution;
+    const baseTotal = Object.values(base).reduce((s, v) => s + v, 0);
+    const deserts = Math.min(
+      config.resources.maxDeserts,
+      Math.max(1, Math.round(mainlandSize * base.desert / baseTotal))
+    );
+    const resourceTiles = mainlandSize - deserts;
+    const baseResourceTotal = baseTotal - base.desert;
+
+    const resourceTypes = Object.keys(base).filter(t => t !== 'desert');
+    const dist = {};
+    let total = 0;
+    for (const t of resourceTypes) {
+      dist[t] = Math.floor(resourceTiles * base[t] / baseResourceTotal);
+      total += dist[t];
+    }
+    // Distribute remainder by fractional part
+    const fracs = resourceTypes.map(t => ({
+      type: t,
+      frac: (resourceTiles * base[t] / baseResourceTotal) - dist[t],
+    }));
+    fracs.sort((a, b) => b.frac - a.frac);
+    let remaining = resourceTiles - total;
+    for (let i = 0; i < remaining; i++) dist[fracs[i].type]++;
+
+    // Build tile list
+    const tileList = [];
+    for (const t of resourceTypes) {
+      for (let i = 0; i < dist[t]; i++) tileList.push(t);
+    }
+    for (let i = 0; i < deserts; i++) tileList.push('desert');
+    // Pad or trim to exact mainland size
+    while (tileList.length < mainlandSize) tileList.push(randPick(resourceTypes));
+    while (tileList.length > mainlandSize) tileList.pop();
+
+    shuffle(tileList);
+
+    // --- Assign to mainland hexes (deserts near centre) ---
+    const mainlandArr = [...mainland];
+    mainlandArr.sort((a, b) => {
+      const ha = parseHexKey(a), hb = parseHexKey(b);
+      return hexDistance(0, 0, ha.q, ha.r) - hexDistance(0, 0, hb.q, hb.r);
+    });
+
+    const resources = new Map();
+    // Place deserts at most-central hexes
+    let desertIdx = 0;
+    const desertHexes = [];
+    const nonDesertHexes = [];
+    for (const hk of mainlandArr) {
+      if (desertIdx < deserts) {
+        resources.set(hk, 'desert');
+        desertHexes.push(hk);
+        desertIdx++;
+      } else {
+        nonDesertHexes.push(hk);
+      }
+    }
+    // Assign remaining resources
+    const resourceOnly = tileList.filter(t => t !== 'desert');
+    shuffle(resourceOnly);
+    for (let i = 0; i < nonDesertHexes.length; i++) {
+      resources.set(nonDesertHexes[i], resourceOnly[i] || randPick(resourceTypes));
+    }
+
+    // --- Optimise: minimise diversity variance across players ---
+    function diversityScore(pair) {
+      const adjHexes = getPlayerAdjacentHexKeys(pair, tiles);
+      const types = new Set();
+      for (const hk of adjHexes) {
+        const res = resources.get(hk);
+        if (res && res !== 'desert') types.add(res);
+      }
+      return types.size;
+    }
+
+    function diversitySpread() {
+      const scores = startPairs.map(p => diversityScore(p));
+      const mn = Math.min(...scores), mx = Math.max(...scores);
+      const spread = mx - mn;
+      // Penalise if any player's normalised diversity falls below minCategoryScore
+      const minCat = config.balance.minCategoryScore || 0;
+      const rng = mx - mn || 1;
+      let penalty = 0;
+      for (const s of scores) {
+        const norm = (s - mn) / rng;
+        if (norm < minCat) penalty += (minCat - norm);
+      }
+      return spread + (config.balance.minCategoryPenalty || 0) * penalty;
+    }
+
+    let bestDSpread = diversitySpread();
+    for (let iter = 0; iter < config.optimization.step4Iterations; iter++) {
+      // Swap two non-desert resource hexes
+      if (nonDesertHexes.length < 2) break;
+      const i = Math.floor(Math.random() * nonDesertHexes.length);
+      let j = Math.floor(Math.random() * nonDesertHexes.length);
+      if (i === j) continue;
+      const h1 = nonDesertHexes[i], h2 = nonDesertHexes[j];
+      const r1 = resources.get(h1), r2 = resources.get(h2);
+      if (r1 === r2) continue;
+
+      resources.set(h1, r2);
+      resources.set(h2, r1);
+      const sp = diversitySpread();
+      if (sp < bestDSpread) {
+        bestDSpread = sp;
+      } else {
+        resources.set(h1, r1);
+        resources.set(h2, r2);
+      }
+    }
+
+    return resources;
+  }
+
+  // ===========================================================================
+  // SECTION 7: STEP 5 — PLACE NUMBER TOKENS
+  // ===========================================================================
+
+  function placeNumbers(topology, startPairs, resources, config) {
+    const { tiles, mainland } = topology;
+
+    // Collect non-desert mainland hexes
+    const resourceHexes = [];
+    for (const hk of mainland) {
+      if (resources.get(hk) !== 'desert') resourceHexes.push(hk);
+    }
+    const numNeeded = resourceHexes.length;
+
+    // --- Scale number pool ---
+    const baseCounts = {};
+    for (const n of config.numbers.basePool) baseCounts[n] = (baseCounts[n] || 0) + 1;
+    const baseLen = config.numbers.basePool.length;
+    const nums = Object.keys(baseCounts).map(Number);
+
+    const scaled = {};
+    let total = 0;
+    for (const n of nums) {
+      scaled[n] = Math.floor(numNeeded * baseCounts[n] / baseLen);
+      total += scaled[n];
+    }
+    const fracList = nums.map(n => ({
+      num: n,
+      frac: (numNeeded * baseCounts[n] / baseLen) - scaled[n],
+    }));
+    fracList.sort((a, b) => b.frac - a.frac);
+    let rem = numNeeded - total;
+    for (let i = 0; i < rem; i++) scaled[fracList[i].num]++;
+
+    const pool = [];
+    for (const n of nums) {
+      for (let i = 0; i < scaled[n]; i++) pool.push(n);
+    }
+    // Pad / trim
+    while (pool.length < numNeeded) pool.push(randPick([3, 4, 5, 9, 10, 11]));
+    while (pool.length > numNeeded) pool.pop();
+    shuffle(pool);
+
+    // --- Check red number adjacency constraint ---
+    // Full scan version (for initial placement)
+    function hasRedAdjacencyFull(numbers) {
+      if (!config.numbers.noAdjacentRedNumbers) return false;
+      for (const [hk, num] of numbers) {
+        if (num !== 6 && num !== 8) continue;
+        const { q, r } = parseHexKey(hk);
+        for (const nb of hexNeighbors(q, r)) {
+          const nbk = hexKey(nb.q, nb.r);
+          const nbNum = numbers.get(nbk);
+          if (nbNum === 6 || nbNum === 8) return true;
+        }
+      }
+      return false;
+    }
+    // Fast check: only check two specific hexes after a swap
+    function hasRedAdjacencyAt(numbers, hk1, hk2) {
+      if (!config.numbers.noAdjacentRedNumbers) return false;
+      for (const hk of [hk1, hk2]) {
+        const num = numbers.get(hk);
+        if (num !== 6 && num !== 8) continue;
+        const { q, r } = parseHexKey(hk);
+        for (const nb of hexNeighbors(q, r)) {
+          const nbk = hexKey(nb.q, nb.r);
+          const nbNum = numbers.get(nbk);
+          if ((nbNum === 6 || nbNum === 8) && nbk !== hk) return true;
+        }
+      }
+      return false;
+    }
+
+    // --- Initial placement with retry to satisfy adjacency ---
+    const numbers = new Map();
+    function assignNumbers(poolArr) {
+      numbers.clear();
+      const p = [...poolArr];
+      shuffle(p);
+      for (let i = 0; i < resourceHexes.length; i++) {
+        numbers.set(resourceHexes[i], p[i]);
+      }
+    }
+
+    // Try up to 100 times to get a valid initial placement
+    for (let attempt = 0; attempt < 100; attempt++) {
+      assignNumbers(pool);
+      if (!hasRedAdjacencyFull(numbers)) break;
+    }
+    // If still invalid, fix by swapping red numbers away from each other
+    let fixAttempts = 0;
+    while (hasRedAdjacencyFull(numbers) && fixAttempts < 500) {
+      const i = Math.floor(Math.random() * resourceHexes.length);
+      const j = Math.floor(Math.random() * resourceHexes.length);
+      if (i === j) continue;
+      const n1 = numbers.get(resourceHexes[i]);
+      const n2 = numbers.get(resourceHexes[j]);
+      numbers.set(resourceHexes[i], n2);
+      numbers.set(resourceHexes[j], n1);
+      fixAttempts++;
+    }
+
+    // --- Precompute static scores (don't change when numbers swap) ---
+    const playerAdjHexes = startPairs.map(p => [...getPlayerAdjacentHexKeys(p, tiles)]);
+
+    // Precompute per-player resource hex keys (for fast pip recalculation)
+    const playerResHexes = playerAdjHexes.map(hexes =>
+      hexes.filter(hk => resources.get(hk) !== 'desert' && mainland.has(hk))
+    );
+
+    // --- Track per-resource-type pip totals for resource balance ---
+    const resPipTotals = {};
+    const resTileCounts = {};
+    for (const hk of resourceHexes) {
+      const res = resources.get(hk);
+      if (!res || res === 'desert') continue;
+      const num = numbers.get(hk);
+      resPipTotals[res] = (resPipTotals[res] || 0) + (config.numbers.pipValues[num] || 0);
+      resTileCounts[res] = (resTileCounts[res] || 0) + 1;
+    }
+
+    function resourcePipSpread() {
+      const avgPips = [];
+      for (const res of Object.keys(resPipTotals)) {
+        if (resTileCounts[res] > 0) avgPips.push(resPipTotals[res] / resTileCounts[res]);
+      }
+      if (avgPips.length < 2) return 0;
+      return Math.max(...avgPips) - Math.min(...avgPips);
+    }
+
+    // Static scores: harbor, island, expansion, diversity (unchanged by number swaps)
+    const staticRaw = computeRawScores(topology, startPairs, null, resources, null, config);
+
+    // Fast resource score computation (only thing that changes)
+    function playerPipScore(playerIdx) {
+      let total = 0;
+      for (const hk of playerResHexes[playerIdx]) {
+        const num = numbers.get(hk);
+        if (num && config.numbers.pipValues[num]) total += config.numbers.pipValues[num];
+      }
+      return total;
+    }
+
+    function fastCompositeSpread() {
+      const pipScores = startPairs.map((_, i) => playerPipScore(i));
+      const minPip = Math.min(...pipScores);
+      const maxPip = Math.max(...pipScores);
+      const pipRange = maxPip - minPip || 1;
+
+      // Rebuild normalised scores using static + dynamic resource
+      const w = config.balance.weights;
+      const composites = startPairs.map((_, i) => {
+        const normResource = (pipScores[i] - minPip) / pipRange;
+        // Use static normalised scores for other categories
+        const raw = staticRaw[i];
+        return w.resource * normResource +
+          w.harbor * raw.harborRaw + // we'll normalise below
+          w.island * raw.islandRaw +
+          w.expansion * raw.expansionRaw +
+          w.diversity * raw.diversityRaw;
+      });
+
+      // Normalise the non-resource scores just once (they're static)
+      // Actually we need proper normalisation. Let's do a simpler approach:
+      // normalise each category across players.
+      const cats = ['harborRaw', 'islandRaw', 'expansionRaw', 'diversityRaw'];
+      const normStatic = cats.map(cat => {
+        const vals = staticRaw.map(s => s[cat]);
+        const mn = Math.min(...vals), mx = Math.max(...vals);
+        const rng = mx - mn || 1;
+        return staticRaw.map(s => (s[cat] - mn) / rng);
+      });
+
+      const minCat = config.balance.minCategoryScore || 0;
+      const minPenMul = config.balance.minCategoryPenalty || 0;
+
+      let minCatPenalty = 0;
+      const finalComposites = startPairs.map((_, i) => {
+        const normResource = pipRange > 0 ? (pipScores[i] - minPip) / pipRange : 1;
+
+        // Penalise any category below minCategoryScore
+        const scores = [normResource, normStatic[0][i], normStatic[1][i], normStatic[2][i], normStatic[3][i]];
+        for (const s of scores) {
+          if (s < minCat) minCatPenalty += (minCat - s);
+        }
+
+        return w.resource * normResource +
+          w.harbor * normStatic[0][i] +
+          w.island * normStatic[1][i] +
+          w.expansion * normStatic[2][i] +
+          w.diversity * normStatic[3][i];
+      });
+      const playerSpread = Math.max(...finalComposites) - Math.min(...finalComposites);
+
+      // Add resource-type pip balance penalty (avg pip spread / max possible spread of 4)
+      const rpSpread = resourcePipSpread();
+      return playerSpread
+        + config.numbers.resourcePipBalanceWeight * (rpSpread / 4)
+        + minPenMul * minCatPenalty;
+    }
+
+    // Helper: apply a number swap and update resPipTotals incrementally
+    function applySwap(h1, h2, n1, n2) {
+      const res1 = resources.get(h1), res2 = resources.get(h2);
+      const pip1 = config.numbers.pipValues[n1] || 0;
+      const pip2 = config.numbers.pipValues[n2] || 0;
+      numbers.set(h1, n2);
+      numbers.set(h2, n1);
+      if (res1 && res1 !== 'desert') resPipTotals[res1] = (resPipTotals[res1] || 0) - pip1 + pip2;
+      if (res2 && res2 !== 'desert') resPipTotals[res2] = (resPipTotals[res2] || 0) - pip2 + pip1;
+    }
+    function revertSwap(h1, h2, n1, n2) {
+      applySwap(h1, h2, n2, n1); // reverse the swap
+    }
+
+    // --- Optimise: minimise composite spread + resource pip balance ---
+    let bestSpread = fastCompositeSpread();
+    for (let iter = 0; iter < config.optimization.step5Iterations; iter++) {
+      const i = Math.floor(Math.random() * resourceHexes.length);
+      const j = Math.floor(Math.random() * resourceHexes.length);
+      if (i === j) continue;
+      const h1 = resourceHexes[i], h2 = resourceHexes[j];
+      const n1 = numbers.get(h1), n2 = numbers.get(h2);
+      if (n1 === n2) continue;
+
+      applySwap(h1, h2, n1, n2);
+      if (hasRedAdjacencyAt(numbers, h1, h2)) {
+        revertSwap(h1, h2, n1, n2);
+        continue;
+      }
+      const sp = fastCompositeSpread();
+      if (sp < bestSpread) {
+        bestSpread = sp;
+      } else {
+        revertSwap(h1, h2, n1, n2);
+      }
+    }
+
+    // --- Final pass: targeted swaps for weakest / strongest players ---
+    for (let iter = 0; iter < config.optimization.finalPassIterations; iter++) {
+      const pipScores = startPairs.map((_, i) => playerPipScore(i));
+      const maxIdx = pipScores.indexOf(Math.max(...pipScores));
+      const minIdx = pipScores.indexOf(Math.min(...pipScores));
+      if (maxIdx === minIdx) break;
+
+      const strongHexes = playerResHexes[maxIdx];
+      const weakHexes = playerResHexes[minIdx];
+      if (strongHexes.length === 0 || weakHexes.length === 0) break;
+
+      const sh = randPick(strongHexes);
+      const wh = randPick(weakHexes);
+      if (sh === wh) continue;
+      const sn = numbers.get(sh), wn = numbers.get(wh);
+      if (sn === wn) continue;
+
+      applySwap(sh, wh, sn, wn);
+      if (hasRedAdjacencyAt(numbers, sh, wh)) {
+        revertSwap(sh, wh, sn, wn);
+        continue;
+      }
+      const sp = fastCompositeSpread();
+      if (sp < bestSpread) {
+        bestSpread = sp;
+      } else {
+        revertSwap(sh, wh, sn, wn);
+      }
+    }
+
+    return numbers;
+  }
+
+  // ===========================================================================
+  // SECTION 8: BALANCE SCORING
+  // ===========================================================================
+
+  /** Raw scores per player (unnormalised). */
+  function computeRawScores(topology, startPairs, harbors, resources, numbers, config) {
+    const { tiles } = topology;
+    return startPairs.map(pair => {
+      const adjHexKeys = getPlayerAdjacentHexKeys(pair, tiles);
+
+      // Resource score (pip-weighted)
+      let pipTotal = 0;
+      if (numbers) {
+        for (const hk of adjHexKeys) {
+          const num = numbers.get(hk);
+          if (num && config.numbers.pipValues[num]) {
+            pipTotal += config.numbers.pipValues[num];
+          }
+        }
+      } else {
+        // Estimate: count non-desert land hexes
+        for (const hk of adjHexKeys) {
+          const t = tiles.get(hk);
+          if (t === 'land') {
+            const res = resources ? resources.get(hk) : null;
+            if (res !== 'desert') pipTotal += 3; // average pip
+          }
+        }
+      }
+
+      // Harbor score
+      let harborTotal = 0;
+      if (harbors) {
+        for (const h of harbors) {
+          const lh = parseHexKey(h.landHex);
+          let minD = Infinity;
+          for (const hk of adjHexKeys) {
+            const ph = parseHexKey(hk);
+            const d = hexDistance(ph.q, ph.r, lh.q, lh.r);
+            if (d < minD) minD = d;
+          }
+          harborTotal += 1 / (1 + minD);
+        }
+      }
+
+      // Island proximity
+      let minIslandDist = Infinity;
+      for (const ia of topology.islandAreas) {
+        for (const ihk of ia) {
+          const ih = parseHexKey(ihk);
+          for (const hk of adjHexKeys) {
+            const ph = parseHexKey(hk);
+            const d = hexDistance(ph.q, ph.r, ih.q, ih.r);
+            if (d < minIslandDist) minIslandDist = d;
+          }
+        }
+      }
+      const islandRaw = 1 / (1 + (minIslandDist === Infinity ? 10 : minIslandDist));
+
+      // Expansion (free mainland vertices within 2 steps)
+      const occupied = new Set();
+      for (const p of startPairs) { occupied.add(p.v1); occupied.add(p.v2); }
+      const reachable = new Set();
+      for (const vk of [pair.v1, pair.v2]) {
+        const { q, r, v } = parseVertexKey(vk);
+        for (const adj of adjacentVertices(q, r, v)) {
+          const ak = vertexKey(adj.q, adj.r, adj.v);
+          if (occupied.has(ak)) continue;
+          const touches = vertexHexes(adj.q, adj.r, adj.v);
+          if (touches.some(h => topology.mainland.has(hexKey(h.q, h.r)))) {
+            reachable.add(ak);
+          }
+          // 2nd level
+          for (const adj2 of adjacentVertices(adj.q, adj.r, adj.v)) {
+            const a2k = vertexKey(adj2.q, adj2.r, adj2.v);
+            if (occupied.has(a2k)) continue;
+            const t2 = vertexHexes(adj2.q, adj2.r, adj2.v);
+            if (t2.some(h => topology.mainland.has(hexKey(h.q, h.r)))) {
+              reachable.add(a2k);
+            }
+          }
+        }
+      }
+      const expansionRaw = reachable.size;
+
+      // Diversity
+      let diversityRaw = 0;
+      if (resources) {
+        const types = new Set();
+        for (const hk of adjHexKeys) {
+          const res = resources.get(hk);
+          if (res && res !== 'desert') types.add(res);
+        }
+        diversityRaw = types.size;
+      }
+
+      return { resourceRaw: pipTotal, harborRaw: harborTotal, islandRaw, expansionRaw, diversityRaw };
+    });
+  }
+
+  /** Normalise raw scores per category.
+   *  Maps [min, max] → [floor, 1.0] where floor = config.balance.minCategoryScore.
+   *  When the range is negligible (< 15% relative to max), all players get 1.0
+   *  to avoid amplifying tiny differences into artificial imbalance. */
+  function normaliseScores(rawScores, config) {
+    const categories = ['resourceRaw', 'harborRaw', 'islandRaw', 'expansionRaw', 'diversityRaw'];
+    const normNames = ['resource', 'harbor', 'island', 'expansion', 'diversity'];
+    const floor = (config && config.balance && config.balance.minCategoryScore) || 0;
+    const result = rawScores.map(s => ({ ...s }));
+
+    for (let c = 0; c < categories.length; c++) {
+      const vals = rawScores.map(s => s[categories[c]]);
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const range = max - min;
+      // If the spread is negligible, treat as equal (all 1.0)
+      const isNegligible = range <= 0 || (max > 0 && range / max < 0.15);
+      for (let i = 0; i < result.length; i++) {
+        if (isNegligible) {
+          result[i][normNames[c]] = 1;
+        } else {
+          // Map [min, max] → [floor, 1.0] so worst player still gets at least floor
+          const t = (rawScores[i][categories[c]] - min) / range; // 0..1
+          result[i][normNames[c]] = floor + (1 - floor) * t;
+        }
+      }
+    }
+    return result;
+  }
+
+  /** Compute composite scores (array of numbers). */
+  function computePlayerComposites(topology, startPairs, harbors, resources, numbers, config) {
+    const raw = computeRawScores(topology, startPairs, harbors, resources, numbers, config);
+    const norm = normaliseScores(raw, config);
+    const w = config.balance.weights;
+    return norm.map(s =>
+      w.resource * s.resource + w.harbor * s.harbor + w.island * s.island +
+      w.expansion * s.expansion + w.diversity * s.diversity
+    );
+  }
+
+  /** Composite spread (max − min). */
+  function computeCompositeSpread(topology, startPairs, harbors, resources, numbers, config) {
+    const composites = computePlayerComposites(topology, startPairs, harbors, resources, numbers, config);
+    return Math.max(...composites) - Math.min(...composites);
+  }
+
+  /** Full balance report for the UI. */
+  function computeBalance(topology, startPairs, harbors, resources, numbers, config) {
+    const raw = computeRawScores(topology, startPairs, harbors, resources, numbers, config);
+    const norm = normaliseScores(raw, config);
+    const w = config.balance.weights;
+
+    for (let i = 0; i < norm.length; i++) {
+      norm[i].composite =
+        w.resource * norm[i].resource + w.harbor * norm[i].harbor +
+        w.island * norm[i].island + w.expansion * norm[i].expansion +
+        w.diversity * norm[i].diversity;
+    }
+
+    const composites = norm.map(s => s.composite);
+    const spread = Math.max(...composites) - Math.min(...composites);
+
+    // Check minimum category violations (should be rare/impossible now that normaliseScores
+    // applies a floor, but kept for effectiveSpread selection pressure)
+    const minCat = (config.balance && config.balance.minCategoryScore) || 0;
+    const categoryNames = ['resource', 'harbor', 'island', 'expansion', 'diversity'];
+    let minCatViolations = 0;
+    let minCatDeficit = 0;
+    for (const p of norm) {
+      for (const cat of categoryNames) {
+        if (p[cat] < minCat) {
+          minCatViolations++;
+          minCatDeficit += (minCat - p[cat]);
+        }
+      }
+    }
+
+    // Effective spread: used for candidate selection (prefers maps without min-category violations)
+    const effectiveSpread = spread + (config.balance.minCategoryPenalty || 0) * minCatDeficit;
+
+    // Rating is based on raw spread (reflects actual player balance)
+    let rating = 'Poor';
+    if (spread <= config.balance.thresholds.excellent) rating = 'Excellent';
+    else if (spread <= config.balance.thresholds.good) rating = 'Good';
+    else if (spread <= config.balance.thresholds.fair) rating = 'Fair';
+
+    // --- Resource pip weights (average pips per tile per resource type) ---
+    const resourceWeights = {};
+    if (numbers && resources) {
+      const resPips = {};
+      const resCounts = {};
+      for (const [hk, res] of resources) {
+        if (res === 'desert') continue;
+        const num = numbers.get(hk);
+        if (!num) continue;
+        resPips[res] = (resPips[res] || 0) + (config.numbers.pipValues[num] || 0);
+        resCounts[res] = (resCounts[res] || 0) + 1;
+      }
+      for (const res of Object.keys(resPips)) {
+        resourceWeights[res] = {
+          totalPips: resPips[res],
+          count: resCounts[res],
+          avgPips: +(resPips[res] / resCounts[res]).toFixed(2),
+        };
+      }
+    }
+
+    return { players: norm, spread, effectiveSpread, rating, resourceWeights, minCatViolations };
+  }
+
+  // ===========================================================================
+  // SECTION 9: MAIN GENERATOR
+  // ===========================================================================
+
+  function generateMap(playerCount, islandCount, configOverrides) {
+    const config = deepMerge(DEFAULT_CONFIG, configOverrides);
+    let bestResult = null;
+    let bestSpread = Infinity;
+
+    for (let retry = 0; retry < config.optimization.maxTopologyRetries; retry++) {
+      const topology = generateTopology(playerCount, islandCount, config);
+      if (!topology) continue;
+
+      const startPairs = findStartingPositions(topology, playerCount, config);
+      if (!startPairs) continue;
+
+      const harbors = placeHarbors(topology, startPairs, playerCount, config);
+      const resources = placeResources(topology, startPairs, harbors, config);
+      const numbers = placeNumbers(topology, startPairs, resources, config);
+      const balance = computeBalance(topology, startPairs, harbors, resources, numbers, config);
+
+      const eff = balance.effectiveSpread;
+      if (eff < bestSpread) {
+        bestSpread = eff;
+        bestResult = { topology, startPairs, harbors, resources, numbers, balance, config };
+      }
+      if (eff <= config.balance.thresholds.excellent) break;
+    }
+
+    return bestResult;
+  }
+
+  // ===========================================================================
+  // EXPORTS
+  // ===========================================================================
+
+  const exports = {
+    DEFAULT_CONFIG,
+    generateMap,
+    generateTopology,
+    findStartingPositions,
+    placeHarbors,
+    placeResources,
+    placeNumbers,
+    computeBalance,
+    // Utilities exposed for testing
+    hexKey,
+    parseHexKey,
+    vertexKey,
+    parseVertexKey,
+    hexNeighbors,
+    hexDistance,
+    vertexHexes,
+    adjacentVertices,
+    getHexVertexKeys,
+    hexToPixel,
+    vertexToPixel,
+    generateFrame,
+    getAllBoardVertices,
+    getPlayerAdjacentHexKeys,
+    deepMerge,
+  };
+
+  if (typeof window !== 'undefined') window.CatanMapGenerator = exports;
+  if (typeof module !== 'undefined' && module.exports) module.exports = exports;
+})();
+</script>
+    <script>
+      // =====================================================================
+      // RENDERER & UI
+      // =====================================================================
+      (function () {
+        "use strict";
+
+        const {
+          hexKey,
+          parseHexKey,
+          vertexKey,
+          parseVertexKey,
+          hexToPixel,
+          vertexToPixel,
+          getHexVertexKeys,
+          vertexHexes,
+          generateMap,
+        } = CatanMapGenerator;
+
+        const PLAYER_COLORS = [
+          "#e74c3c", // red
+          "#3498db", // blue
+          "#f39c12", // orange
+          "#2ecc71", // green
+          "#9b59b6", // purple
+          "#1abc9c", // teal
+        ];
+
+        const RESOURCE_COLORS = {
+          wood: "#2d7d3a",
+          wheat: "#d4a017",
+          sheep: "#7cc03f",
+          ore: "#8a8a8a",
+          brick: "#c4622d",
+          desert: "#d4c080",
+        };
+
+        const RESOURCE_LABELS = {
+          wood: "W",
+          wheat: "Wh",
+          sheep: "S",
+          ore: "O",
+          brick: "B",
+          desert: "D",
+        };
+
+        const WATER_COLOR = "#1a6eb5";
+        const ISLAND_COLOR = "#0f4c7a";
+        const HEX_BORDER = "rgba(255,255,255,0.15)";
+        const LAND_BORDER = "rgba(0,0,0,0.3)";
+
+        // ---------------------------------------------------------------
+        // Drawing helpers
+        // ---------------------------------------------------------------
+
+        function drawHexPolygon(ctx, cx, cy, size) {
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            const x = cx + size * Math.cos(angle);
+            const y = cy + size * Math.sin(angle);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+        }
+
+        // ---------------------------------------------------------------
+        // Main render function
+        // ---------------------------------------------------------------
+
+        function renderMap(result) {
+          if (!result) return;
+
+          const canvas = document.getElementById("boardCanvas");
+          const ctx = canvas.getContext("2d");
+          const {
+            topology,
+            startPairs,
+            harbors,
+            resources,
+            numbers,
+            balance,
+            config,
+          } = result;
+          const { tiles, mainland, islandAreas, frame } = topology;
+
+          // --- Compute hex size to fit canvas ---
+          const allHexes = [...tiles.keys()];
+          let minPx = Infinity,
+            maxPx = -Infinity,
+            minPy = Infinity,
+            maxPy = -Infinity;
+          for (const hk of allHexes) {
+            const { q, r } = parseHexKey(hk);
+            const p = hexToPixel(q, r, 1);
+            minPx = Math.min(minPx, p.x - 1);
+            maxPx = Math.max(maxPx, p.x + 1);
+            minPy = Math.min(minPy, p.y - Math.sqrt(3) * 0.5);
+            maxPy = Math.max(maxPy, p.y + Math.sqrt(3) * 0.5);
+          }
+          const gridW = maxPx - minPx;
+          const gridH = maxPy - minPy;
+          const pad = 40;
+          const size = Math.min(
+            (canvas.width - 2 * pad) / gridW,
+            (canvas.height - 2 * pad) / gridH
+          );
+          const offX = canvas.width / 2 - ((minPx + maxPx) / 2) * size;
+          const offY = canvas.height / 2 - ((minPy + maxPy) / 2) * size;
+
+          function tx(q, r) {
+            const p = hexToPixel(q, r, size);
+            return { x: p.x + offX, y: p.y + offY };
+          }
+
+          function tvx(q, r, v) {
+            const p = vertexToPixel(q, r, v, size);
+            return { x: p.x + offX, y: p.y + offY };
+          }
+
+          // --- Clear ---
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // --- Draw hexes ---
+          for (const hk of allHexes) {
+            const { q, r } = parseHexKey(hk);
+            const { x: cx, y: cy } = tx(q, r);
+            const tileType = tiles.get(hk);
+
+            let fill = WATER_COLOR;
+            let border = HEX_BORDER;
+
+            if (tileType === "island_area") {
+              fill = ISLAND_COLOR;
+            } else if (tileType === "land") {
+              const res = resources.get(hk);
+              fill = RESOURCE_COLORS[res] || "#c4a862";
+              border = LAND_BORDER;
+            }
+
+            drawHexPolygon(ctx, cx, cy, size);
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.strokeStyle = border;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Island area "?" label
+            if (tileType === "island_area") {
+              ctx.fillStyle = "rgba(255,255,255,0.4)";
+              ctx.font = `bold ${Math.round(size * 0.5)}px sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText("?", cx, cy);
+            }
+
+            // Resource label for land tiles
+            if (tileType === "land") {
+              const res = resources.get(hk);
+              if (res && res !== "desert") {
+                // Draw small label
+                ctx.fillStyle = "rgba(255,255,255,0.6)";
+                ctx.font = `${Math.round(size * 0.25)}px sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(RESOURCE_LABELS[res] || "", cx, cy + size * 0.42);
+              }
+            }
+          }
+
+          // --- Draw number tokens ---
+          for (const hk of allHexes) {
+            const num = numbers.get(hk);
+            if (!num) continue;
+            const { q, r } = parseHexKey(hk);
+            const { x: cx, y: cy } = tx(q, r);
+
+            const radius = size * 0.32;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fillStyle = "#f5f0dc";
+            ctx.fill();
+            ctx.strokeStyle = "#8b7d5e";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Number text
+            const isRed = num === 6 || num === 8;
+            ctx.fillStyle = isRed ? "#c0392b" : "#2c3e50";
+            ctx.font = `bold ${Math.round(size * 0.28)}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(String(num), cx, cy - 1);
+
+            // Pip dots
+            const pips = config.numbers.pipValues[num] || 0;
+            const dotY = cy + radius * 0.55;
+            const dotR = size * 0.035;
+            const dotSpacing = size * 0.09;
+            const startX = cx - ((pips - 1) * dotSpacing) / 2;
+            ctx.fillStyle = isRed ? "#c0392b" : "#7f8c8d";
+            for (let i = 0; i < pips; i++) {
+              ctx.beginPath();
+              ctx.arc(startX + i * dotSpacing, dotY, dotR, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          // --- Draw harbors ---
+          for (const harbor of harbors) {
+            const pv1 = parseVertexKey(harbor.v1);
+            const pv2 = parseVertexKey(harbor.v2);
+            const p1 = tvx(pv1.q, pv1.r, pv1.v);
+            const p2 = tvx(pv2.q, pv2.r, pv2.v);
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+
+            // Offset toward water side
+            const lh = parseHexKey(harbor.landHex);
+            const landCenter = tx(lh.q, lh.r);
+            const dx = midX - landCenter.x;
+            const dy = midY - landCenter.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const harborX = midX + (dx / len) * size * 0.4;
+            const harborY = midY + (dy / len) * size * 0.4;
+
+            // Draw connecting lines from harbor to coast vertices
+            ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(harborX, harborY);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+
+            // Harbor circle
+            const hRadius = size * 0.25;
+            ctx.beginPath();
+            ctx.arc(harborX, harborY, hRadius, 0, Math.PI * 2);
+            ctx.fillStyle =
+              harbor.type === "generic"
+                ? "#f5f0dc"
+                : RESOURCE_COLORS[harbor.type] || "#f5f0dc";
+            ctx.fill();
+            ctx.strokeStyle = "#8b7d5e";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Harbor label
+            ctx.fillStyle = harbor.type === "generic" ? "#2c3e50" : "#fff";
+            ctx.font = `bold ${Math.round(size * 0.18)}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const label = harbor.type === "generic" ? "3:1" : "2:1";
+            ctx.fillText(label, harborX, harborY);
+          }
+
+          // --- Draw starting positions ---
+          for (const pair of startPairs) {
+            const color = PLAYER_COLORS[pair.player] || "#fff";
+            for (const vk of [pair.v1, pair.v2]) {
+              const pv = parseVertexKey(vk);
+              const pos = tvx(pv.q, pv.r, pv.v);
+
+              // Outer circle
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, size * 0.18, 0, Math.PI * 2);
+              ctx.fillStyle = color;
+              ctx.fill();
+              ctx.strokeStyle = "#fff";
+              ctx.lineWidth = 2;
+              ctx.stroke();
+
+              // Player number
+              ctx.fillStyle = "#fff";
+              ctx.font = `bold ${Math.round(size * 0.18)}px sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText(String(pair.player + 1), pos.x, pos.y);
+            }
+          }
+
+          // --- Update tile stats ---
+          let waterCount = 0,
+            islandTileCount = 0;
+          for (const [, t] of tiles) {
+            if (t === "water") waterCount++;
+            if (t === "island_area") islandTileCount++;
+          }
+          document.getElementById("mainLandTiles").textContent = mainland.size;
+          document.getElementById("islandCount").textContent =
+            islandAreas.length;
+          document.getElementById("islandTiles").textContent = islandTileCount;
+          document.getElementById("waterTiles").textContent = waterCount;
+
+          // --- Update balance table ---
+          renderBalanceTable(balance, startPairs.length);
+        }
+
+        // ---------------------------------------------------------------
+        // Balance table
+        // ---------------------------------------------------------------
+
+        function renderBalanceTable(balance, playerCount) {
+          const section = document.getElementById("balanceSection");
+          section.style.display = "";
+
+          // Rating badge
+          const ratingEl = document.getElementById("balanceRating");
+          ratingEl.textContent = `${
+            balance.rating
+          } (spread: ${balance.spread.toFixed(3)})`;
+          ratingEl.className =
+            "balance-rating rating-" + balance.rating.toLowerCase();
+
+          // Table body
+          const tbody = document.getElementById("balanceBody");
+          tbody.innerHTML = "";
+
+          const categories = [
+            "resource",
+            "harbor",
+            "island",
+            "expansion",
+            "diversity",
+            "composite",
+          ];
+
+          for (let i = 0; i < playerCount; i++) {
+            const p = balance.players[i];
+            const row = document.createElement("tr");
+
+            // Player cell
+            const playerCell = document.createElement("td");
+            const dot = document.createElement("span");
+            dot.className = "player-dot";
+            dot.style.backgroundColor = PLAYER_COLORS[i];
+            playerCell.appendChild(dot);
+            playerCell.appendChild(document.createTextNode(`P${i + 1}`));
+            row.appendChild(playerCell);
+
+            for (const cat of categories) {
+              const td = document.createElement("td");
+              const val = p[cat] !== undefined ? p[cat] : 0;
+
+              // Score bar
+              const bar = document.createElement("span");
+              bar.className = "score-bar";
+              bar.style.width = Math.round(val * 50) + "px";
+              bar.style.backgroundColor =
+                cat === "composite"
+                  ? PLAYER_COLORS[i]
+                  : "rgba(102, 126, 234, 0.6)";
+              td.appendChild(bar);
+              td.appendChild(document.createTextNode(val.toFixed(2)));
+              row.appendChild(td);
+            }
+
+            tbody.appendChild(row);
+          }
+
+          // Resource weights
+          const rwContainer = document.getElementById("resourceWeights");
+          rwContainer.innerHTML = "";
+          if (balance.resourceWeights) {
+            const resOrder = ["wood", "wheat", "sheep", "ore", "brick"];
+            const avgPips = resOrder
+              .filter((r) => balance.resourceWeights[r])
+              .map((r) => balance.resourceWeights[r].avgPips);
+            const minAvg = Math.min(...avgPips);
+            const maxAvg = Math.max(...avgPips);
+
+            for (const res of resOrder) {
+              const rw = balance.resourceWeights[res];
+              if (!rw) continue;
+              const chip = document.createElement("div");
+              chip.style.cssText =
+                "display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.07);padding:5px 10px;border-radius:6px;font-size:0.85rem;";
+
+              const dot = document.createElement("span");
+              dot.style.cssText = `width:12px;height:12px;border-radius:3px;background:${RESOURCE_COLORS[res]};flex-shrink:0;`;
+              chip.appendChild(dot);
+
+              const label = document.createElement("span");
+              label.style.opacity = "0.8";
+              label.textContent =
+                res.charAt(0).toUpperCase() + res.slice(1) + ":";
+              chip.appendChild(label);
+
+              const val = document.createElement("span");
+              val.style.fontWeight = "600";
+              val.textContent = rw.avgPips.toFixed(1);
+              // Color code: green if balanced, red if extreme
+              if (maxAvg - minAvg > 0.5) {
+                if (rw.avgPips === maxAvg)
+                  val.style.color = "#e74c3c"; // red = too high
+                else if (rw.avgPips === minAvg)
+                  val.style.color = "#3498db"; // blue = too low
+                else val.style.color = "#2ecc71"; // green = balanced
+              } else {
+                val.style.color = "#2ecc71"; // all balanced
+              }
+              chip.appendChild(val);
+
+              const pips = document.createElement("span");
+              pips.style.cssText = "font-size:0.75rem;opacity:0.5;";
+              pips.textContent = `(${rw.totalPips}/${rw.count})`;
+              chip.appendChild(pips);
+
+              rwContainer.appendChild(chip);
+            }
+          }
+        }
+
+        // ---------------------------------------------------------------
+        // Generate & wire up
+        // ---------------------------------------------------------------
+
+        function generate() {
+          const btn = document.getElementById("generateBtn");
+          btn.disabled = true;
+          btn.textContent = "Generating...";
+
+          // Use requestAnimationFrame so the UI updates before heavy computation
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const playerCount = parseInt(
+                document.getElementById("playerCount").value,
+                10
+              );
+              const islandCount = parseInt(
+                document.getElementById("islandCountSelect").value,
+                10
+              );
+              const islandTilesPerPlayer = parseInt(
+                document.getElementById("islandTilesPerPlayer").value,
+                10
+              );
+
+              const result = generateMap(playerCount, islandCount, {
+                islands: { islandTilesPerPlayer },
+              });
+              if (result) {
+                renderMap(result);
+              } else {
+                alert(
+                  "Could not generate a balanced map. Try different settings."
+                );
+              }
+
+              btn.disabled = false;
+              btn.textContent = "Generate New Map";
+            }, 30);
+          });
+        }
+
+        document
+          .getElementById("generateBtn")
+          .addEventListener("click", generate);
+
+        // Generate on load
+        generate();
+      })();
+    </script>
+  </body>
+</html>
